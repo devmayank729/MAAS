@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """MAAS Interactive Client CLI
-Run scripts, check node specs, and read logs on your remote MAAS node.
+Run scripts, check node specs, and live-stream logs from your remote MAAS node.
 """
 
 import sys
@@ -40,21 +40,22 @@ class MaasClient:
                 result = res.get("result", {})
                 content = result.get("content", [])
                 text = content[0].get("text", "") if content else ""
-                # Parse JSON if output is serialized
+                parsed_data = text
                 if "\n{" in text:
                     prefix, json_str = text.split("\n", 1)
                     try:
-                        return result.get("isError", False), json.loads(json_str), text
+                        parsed_data = json.loads(json_str)
                     except Exception:
                         pass
-                return result.get("isError", False), text, text
+                return result.get("isError", False), parsed_data, content
         except urllib.error.HTTPError as e:
-            return True, f"HTTP Error {e.code}: {e.read().decode()}", ""
+            err_msg = e.read().decode(errors="replace")
+            return True, f"HTTP Error {e.code}: {err_msg}", []
         except Exception as e:
-            return True, str(e), ""
+            return True, str(e), []
 
     def get_capabilities(self):
-        err, data, raw = self.mcp_call("get_node_capabilities")
+        err, data, content = self.mcp_call("get_node_capabilities")
         if err:
             print("Error:", data)
             return
@@ -71,7 +72,7 @@ class MaasClient:
             for name, info in data.get("runtimes", {}).items():
                 print(f"  • {name}: {info.get('version', '')} ({info.get('path')})")
         else:
-            print(raw)
+            print(data)
 
     def run_script(self, code_or_file, explanation="Run via MAAS CLI", interpreter=None):
         if os.path.isfile(code_or_file):
@@ -92,7 +93,7 @@ class MaasClient:
         args = {
             "explanation": explanation,
             "wait_sec": 55,
-            "wait_for_exit_sec": 60
+            "wait_for_exit_sec": 5
         }
         if target_path:
             args["path"] = target_path
@@ -101,29 +102,70 @@ class MaasClient:
         if interpreter:
             args["interpreter"] = interpreter
 
-        print("\n" + "=" * 60)
+        print("\n" + "=" * 65)
         print("🔔 APPROVAL REQUIRED ON YOUR PHONE OR HP TERMINAL!")
-        print("=" * 60)
-        print(f"AI/Script Explanation: {explanation}")
+        print("=" * 65)
+        print(f"Script: {target_path or 'Inline code'}")
+        print(f"Reason: {explanation}")
         print("Waiting for approval (tap Run on phone or press 'y' on HP laptop)...")
 
-        err, data, raw = self.mcp_call("execute_script", args)
-        if isinstance(data, dict):
-            task_id = data.get("task_id", "")
-            state = data.get("state", "")
-            failure_kind = data.get("failure_kind", "")
-            print(f"\nTask {task_id}: {state} (result: {failure_kind})")
+        err, data, _ = self.mcp_call("execute_script", args)
+        if not isinstance(data, dict):
+            print("Response:", data)
+            return
 
-            # Fetch process logs
-            err_log, logs, raw_logs = self.mcp_call("read_process_logs", {"task_id": task_id, "tail": True, "max_bytes": 8192})
-            print("\n--- Output ---")
-            if isinstance(raw_logs, str):
-                print(raw_logs)
-            else:
-                print(logs)
-            print("--------------")
-        else:
-            print("Response:", raw)
+        task_id = data.get("task_id", "")
+        state = data.get("state", "PENDING")
+        offset = 0
+        seen_approval = False
+
+        while state in ["PENDING", "APPROVED", "RUNNING", "QUEUED"]:
+            time.sleep(1.0)
+            err_task, task_info, _ = self.mcp_call("get_task", {"task_id": task_id, "wait_sec": 2})
+            if isinstance(task_info, dict):
+                new_state = task_info.get("state", state)
+                if new_state != state:
+                    state = new_state
+                    if state == "RUNNING" and not seen_approval:
+                        print("\n🚀 [APPROVED & RUNNING] Live stream from HP Server:")
+                        print("-" * 65)
+                        seen_approval = True
+                    elif state in ["EXITED", "KILLED", "DENIED"]:
+                        break
+
+            # Fetch any new logs
+            err_log, meta, raw_items = self.mcp_call("read_process_logs", {
+                "task_id": task_id,
+                "offset": offset,
+                "max_bytes": 8192
+            })
+            if isinstance(raw_items, list) and len(raw_items) > 1:
+                log_chunk = raw_items[1].get("text", "")
+                if log_chunk:
+                    # Strip standard MAAS banner prefix if already at offset 0
+                    sys.stdout.write(log_chunk)
+                    sys.stdout.flush()
+                if isinstance(meta, dict) and "next_offset" in meta:
+                    offset = meta["next_offset"]
+
+        # Final drain of remaining logs
+        err_log, meta, raw_items = self.mcp_call("read_process_logs", {
+            "task_id": task_id,
+            "offset": offset,
+            "max_bytes": 8192
+        })
+        if isinstance(raw_items, list) and len(raw_items) > 1:
+            log_chunk = raw_items[1].get("text", "")
+            if log_chunk:
+                sys.stdout.write(log_chunk)
+                sys.stdout.flush()
+
+        err_task, task_info, _ = self.mcp_call("get_task", {"task_id": task_id})
+        if isinstance(task_info, dict):
+            print("\n" + "-" * 65)
+            print(f"🏁 Task {task_id}: {task_info.get('state')} (Result: {task_info.get('failure_kind')})")
+            print(f"⏱  Duration: {task_info.get('duration_sec', 0):.1f}s | Peak RAM: {task_info.get('peak_memory_mb', 0)} MB")
+            print("-" * 65)
 
 def main():
     parser = argparse.ArgumentParser(description="MAAS Remote CLI")
