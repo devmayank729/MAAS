@@ -1,6 +1,6 @@
 # MAAS — Make Anything Server
 
-> **Turn any spare computer into an AI-operable research node with one command, a QR code, and your phone as the safety switch.**
+> **"AWS for Free" — Recycle any old, spare laptop into your own private AI compute server, with your phone as the remote safety switch.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![C++17](https://img.shields.io/badge/Language-C%2B%2B17-blue.svg)](src/)
@@ -10,22 +10,71 @@
 
 ---
 
-## 💡 The Idea: What is MAAS?
+## ⚡ The 30-Second TL;DR (Explain Like I'm 5)
 
-Modern AI agents (Claude Code, local Ollama models like Gemma 4, Cursor, Antigravity) are powerful coding partners: they write scripts, install packages, ingest datasets, and iterate on code. 
+> **"What if you had your own private AWS cloud in your bedroom that costs $0, never drains your battery, and lets you approve every line of AI code from your phone?"**
 
-However, running arbitrary agent-generated code on your primary workstation presents serious problems:
-1. **Security & Data Risk**: Prompt injection or hallucinations can accidentally delete files or expose private tokens.
-2. **Resource Exhaustion**: Large data processing, compiling, or infinite loops freeze your work machine and drain your battery.
-3. **Expensive Cloud Lock-in**: Spinning up cloud VMs (AWS EC2, GCP, modal) costs money and adds complex SSH/VPN network setup.
+<p align="center">
+  <img src="assets/maas_architecture.jpg" alt="MAAS 3-Device System Architecture" width="100%" style="border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);" />
+</p>
 
-**MAAS solves this by turning old, spare laptops or desktop computers into secure, dedicated compute nodes over your local Wi-Fi.**
-
-Built as a lightweight, single-binary C++17 daemon with zero runtime dependencies, MAAS serves an **MCP (Model Context Protocol)** endpoint. AI agents on your main machine can offload heavy compute, file manipulation, and dataset analysis to the spare machine—while **you retain 100% human-in-the-loop control through your phone**.
+1. **You have a main laptop** (like a MacBook Air or Windows work machine) where you code and chat with AI agents (Claude, Gemma, Cursor, ChatGPT).
+2. **You have an old laptop** sitting in a drawer or closet that nobody uses.
+3. **MAAS connects them over your home Wi-Fi in 60 seconds.**
+4. When your AI writes heavy Python code, trains machine learning models, or crunches large datasets, **the old laptop does 100% of the hard work**.
+5. **Your phone is the circuit breaker**: Before the AI runs any script or installs packages, your phone buzzes with a preview of the code and a **[Run]** or **[Deny]** button.
 
 ---
 
-## 📐 Architecture
+## 🥊 Why MAAS? (The Comparison)
+
+| Factor | Running on Your Main Laptop | Renting Cloud (AWS / GCP / Modal) | 🚀 With MAAS (Our Project) |
+|---|---|---|---|
+| **Cost** | Free | **$30 – $100+ / month** (easy to forget and get billed) | **100% Free Forever** (recycles your existing hardware) |
+| **Battery & Thermals** | Laptop gets boiling hot, battery dies in 40 mins | Saves battery, but requires Internet / Cloud access | **Main laptop stays cool & silent**; old laptop takes the heat |
+| **Safety & Privacy** | **Dangerous**: AI hallucinations can delete local files | Private, but data leaves your local home network | **Air-gapped on your LAN**; no data leaves your home Wi-Fi |
+| **Human Control** | Terminal popups that interrupt your active work | Opaque SSH logs with no physical kill-switch | **Physical Phone Safety Switch** with 1-tap Approve / Deny |
+| **Can You Close the Lid?** | ❌ No. If you close your laptop, the AI job dies | Yes | **✅ Yes!** Close your Mac and sleep; the old laptop keeps computing |
+
+---
+
+## 📱 The Phone Safety Switch (Human-in-the-Loop)
+
+<p align="center">
+  <img src="assets/maas_phone_ui.jpg" alt="MAAS Mobile Safety Switch" width="75%" style="border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);" />
+</p>
+
+Whenever the AI agent (e.g. Claude Code or local Gemma 4) tries to execute code, install packages, or mutate files on the server:
+- Execution **pauses automatically**.
+- Your phone loads the **embedded MAAS Safety Dashboard** (works over local Wi-Fi with zero app installation).
+- You inspect:
+  - The **exact code** about to execute.
+  - A **diff** highlighting changes from previous runs.
+  - **"AI says: ..."** — the AI's natural language explanation of why it needs to run this.
+  - Hardware limits: RAM cap, CPU timeout, and disk floor.
+- Tap **[Run Once]**, **[Allow 10 Runs]**, or **[Deny]**.
+- **Cryptographic guarantee:** The approved code is SHA-256 hashed. If a prompt-injection attack or race condition alters even a single character before execution, the node immediately halts.
+
+---
+
+## 🌟 Real-World Use Cases (Why This Wins Hackathons)
+
+### 1. 🤖 24/7 Background AI Coding & Overnight Research
+Tell your local Gemma or Claude agent: *"Run this genetic algorithm simulation for 500 generations."*
+Normally, you cannot close your laptop or leave your desk. With MAAS, the compute job runs on the old laptop in the corner. You can shut your MacBook lid, put it in your backpack, or go to sleep—the job continues uninterrupted.
+
+### 2. 📊 Heavy Machine Learning & Big-Data Crunching
+Train Random Forest classifiers, run dense matrix multiplications, or ingest multi-gigabyte CSV/TSV datasets. MAAS features a custom streaming ingestion engine that converts gigabyte tables into indexed SQLite databases with constant memory, allowing low-RAM older machines to serve as high-performance data warehouses.
+
+### 3. 🛡️ Sandboxing Untrusted Open-Source Code
+Need an AI agent to clone a messy GitHub repository, install arbitrary dependencies, and run test suites? Running this on your main machine risks system dependency conflicts or malware. Running it on the MAAS node isolates the risk to a disposable sandbox with automatic memory watchdogs (`OOM_KILLED`) and execution timeouts.
+
+### 4. ♻️ E-Waste Recycling & Democratizing AI Compute (Theme 2 Alignment)
+Millions of laptops are discarded every year simply because their screens or batteries are degraded. MAAS breathes new life into this hardware, converting discarded machines into high-utility open-innovation compute nodes for students, hobbyists, and researchers who cannot afford expensive cloud bills.
+
+---
+
+## 📐 Complete System Architecture
 
 ```
                        ┌───────────────────────────────────────────────┐
@@ -73,65 +122,34 @@ Built as a lightweight, single-binary C++17 daemon with zero runtime dependencie
 
 ---
 
-## ✨ Key Features & Innovations
+## 🛠️ The 16 Model Context Protocol (MCP) Tools
 
-### 1. 🛡️ Phone as the Hardware Safety Switch
-Every script execution, package installation, or dataset overwrite requires physical human approval. 
-- Scan the terminal QR code with your phone camera.
-- The phone loads an ultra-fast, zero-dependency safety page embedded directly in the C++ binary.
-- View the **exact script contents**, a **diff against prior runs**, and the **AI's stated reasoning** ("AI says: ...").
-- Tap **Run Once**, **Allow 10 Runs**, or **Deny**. Approvals auto-expire after 5 minutes if unaddressed.
+MAAS exposes 16 standardized tools accessible by any AI client conforming to Anthropic's Model Context Protocol (MCP):
 
-### 2. 🔒 Cryptographic Hash-Bound Execution
-Approved scripts are copied to a content-addressed store and re-hashed right before process spawning. If a prompt-injection or race condition modifies even a single byte of the file between approval and execution, MAAS rejects the run and demands fresh authorization.
-
-### 3. 🧠 100% Local AI Integration: Ollama & Gemma 4 Ready
-MAAS includes an autonomous agent client ([`ollama_agent.py`](ollama_agent.py)) that connects locally running **Gemma 4** (via Ollama on Apple Silicon or Linux/Windows) to the remote MAAS compute node. Gemma autonomously reasons about the compute environment, drafts scripts, executes them remotely, and reports the synthesis back to you.
-
-### 4. 🧯 Kernel Guardrails & Resilient Watchdogs
-- **Memory Ceiling**: Real-time memory watchdog kills runaway memory hogs (`OOM_KILLED`) without taking down the node or the operating system.
-- **Wall-Clock Timeouts**: Enforced hard deadlines terminate infinite loops.
-- **Disk Floor Protection**: Rejects file creations and uploads if free disk space drops below 500 MB.
-- **Process Tree Cleanup**: Terminates all spawned subprocesses and child trees cleanly on shutdown or cancellation.
-
-### 5. 📊 Bigger-Than-RAM Dataset Streaming Engine
-The built-in `ingest_dataset` tool streams gigabyte-scale CSV/TSV files into SQLite databases using constant memory (compatible with older laptops with low RAM). It automatically detects delimiters, UTF-8/BOM/UTF-16 encodings, repairs ragged rows, profiles column types and null counts, and exposes a read-only, row-capped `query_sql` interface.
-
-### 6. 🔌 Multi-Client Protocol Adapters
-- **Streamable HTTP MCP** (`/mcp`) for modern remote clients.
-- **Stdio Bridge** ([`bridge.py`](bridge.py)) allowing local IDEs like **Cursor**, **Claude Desktop**, and **Antigravity** to communicate seamlessly over stdin/stdout.
-- **Interactive Terminal CLI** ([`maas_cli.py`](maas_cli.py)) to test and operate nodes directly from your command line.
-
----
-
-## 🛠️ The 16 MCP Tools
-
-MAAS implements the full Model Context Protocol specification with 16 native tools:
-
-| Tool | Category | Tier | Description |
+| Category | Tool | Tier | Description |
 |---|---|---|---|
-| `get_node_capabilities` | System | 0 | Probes CPU model, cores, AVX/AVX2 features, available RAM, disk space, and discovered runtimes. |
-| `list_files` | Workspace | 1 | Lists files and directories in the sandboxed workspace. |
-| `read_file` | Workspace | 1 | Reads files safely from the node's workspace with path-traversal jailing. |
-| `write_file` | Workspace | 1 | Writes or updates code/data files in the workspace. |
-| `delete_file` | Workspace | 1 | Deletes files from the workspace. |
-| `execute_script` | Execution | 2 | **Runs Python/Node/Bash/R scripts.** Bound by memory limit, timeout, and phone approval. |
-| `get_task` | Tasks | 0 | Polls task state, exit code, resource utilization, and structured failure kinds. |
-| `list_processes` | Tasks | 0 | Lists active and recent processes running on the node. |
-| `read_process_logs` | Logs | 0 | Streams paged stdout/stderr logs (up to 8 KB per chunk) to avoid flooding conversation contexts. |
-| `terminate_process` | Tasks | 0 | Kills a running or queued process tree instantly. Never requires approval. |
-| `install_packages` | Packages | 2 | Installs Python (`pip`) or Node (`npm`) packages into MAAS's private prefix (not root). |
-| `ingest_dataset` | Data | 2 | Streams tabular data (CSV/TSV) into SQLite with automated column profiling and row repair. |
-| `describe_dataset` | Data | 0 | Returns dataset profile: row counts, column types, null counts, min/max values. |
-| `list_datasets` | Data | 0 | Lists all ingested SQLite datasets and their file sizes. |
-| `query_sql` | Data | 0 | Executes read-only SQL queries (`SELECT`) with strict row limits against ingested datasets. |
-| `patch_file` | Workspace | 1 | Applies unified diffs to workspace files. |
+| **System** | `get_node_capabilities` | Tier 0 | Probes hardware: CPU model, cores, AVX/AVX2 support, free RAM, disk, and discovered runtimes. |
+| **Workspace** | `list_files` | Tier 1 | Lists files and directories in the sandboxed workspace. |
+| **Workspace** | `read_file` | Tier 1 | Reads files safely from the workspace with path-traversal jail protection. |
+| **Workspace** | `write_file` | Tier 1 | Writes code or data files into the node's workspace. |
+| **Workspace** | `delete_file` | Tier 1 | Safely deletes files from the workspace. |
+| **Workspace** | `patch_file` | Tier 1 | Applies unified diffs directly to files. |
+| **Execution** | `execute_script` | **Tier 2** | **Executes Python, Node, Bash, or R scripts.** Sandboxed by memory limits, wall-clock timeout, and phone approval. |
+| **Execution** | `get_task` | Tier 0 | Polls process state, exit codes, and structured failure categories. |
+| **Execution** | `list_processes` | Tier 0 | Lists active and recent processes on the node. |
+| **Execution** | `read_process_logs` | Tier 0 | Live-streams chunked process stdout/stderr logs (up to 8 KB per chunk). |
+| **Execution** | `terminate_process` | Tier 0 | Instantly terminates a running process tree. Never requires approval. |
+| **Packages** | `install_packages` | **Tier 2** | Installs Python (`pip`) or Node (`npm`) packages into MAAS's private prefix (not system root). |
+| **Data Engine**| `ingest_dataset` | **Tier 2** | Streams large CSV/TSVs into SQLite with automatic encoding detection and column profiling. |
+| **Data Engine**| `describe_dataset` | Tier 0 | Returns comprehensive dataset profile: row counts, column types, null counts, min/max values. |
+| **Data Engine**| `list_datasets` | Tier 0 | Lists all ingested datasets and their table sizes. |
+| **Data Engine**| `query_sql` | Tier 0 | Runs read-only, row-capped SQL queries (`SELECT`) directly against ingested datasets. |
 
 ---
 
-## 🚀 Quick Start Guide
+## 🚀 60-Second Setup Guide
 
-### Step 1: Install & Start on the Compute Node (e.g. Spare Linux/macOS Laptop)
+### 1. Start the Compute Node (On the Spare Laptop)
 
 ```bash
 git clone https://github.com/devmayank729/MAAS.git maas
@@ -140,14 +158,14 @@ sh install.sh
 maas start
 ```
 
-*The terminal will display the node specs, the local network URL, an ASCII QR code, and a client pairing code.*
+*The terminal will display your node's specs, its IP address, an ASCII QR code, and a client pairing code:*
 
 ```text
   MAAS node "maas-node" is running  v0.1.0
   Ubuntu 24.04.4 LTS, AMD Ryzen 3 5300U (8 threads, AVX2), 15305 MB RAM
   Address  http://10.80.18.195:7420
 
-  1. Scan with your phone to approve jobs (phone on the same Wi-Fi):
+  1. Scan with your phone to approve jobs:
   [ QR Code ]
   http://10.80.18.195:7420/pair#k=wkqkmjthvc9x82x3
 
@@ -155,48 +173,40 @@ maas start
      curl -s -X POST http://10.80.18.195:7420/api/pair -H 'Content-Type: application/json' -d '{"code":"0585-3128"}'
 ```
 
----
+### 2. Pair Your Phone
 
-### Step 2: Connect Phone Safety Switch
+Scan the QR code with your phone camera (or open the URL in your phone browser). Keep the tab open to approve or deny jobs.
 
-Scan the QR code displayed on the node's screen with your phone camera (or open the `/pair#k=...` link). You will see the **"Paired"** screen. Keep this tab open.
+### 3. Connect Your AI Client on Your Main Laptop
 
----
-
-### Step 3: Connect Your AI Client (Pick Your Favorite)
-
-#### Option A: Local Ollama Agent (Gemma 4 on Mac/PC)
-If you run Ollama locally with `gemma4:12b` (or Llama 3 / Mistral):
+#### Option A: Local Ollama (Gemma 4) Autonomous Agent
+Talk to your locally running open-weight model:
 ```bash
 python3 ollama_agent.py
 ```
-*Gemma will load all 16 remote tools and chat with you in your terminal, offloading heavy execution to the node.*
+*Gemma loads all 16 remote tools, writes code, dispatches jobs to the node, and awaits your phone approval.*
 
-#### Option B: Standalone Terminal CLI
-Run tasks without any LLM directly from your main laptop:
+#### Option B: Standalone Live-Streaming CLI
+Run scripts directly from your main laptop with live real-time output:
 ```bash
-# Check remote node specs:
+# Check remote specs:
 python3 maas_cli.py specs
 
-# Run a Python one-liner on the remote node:
-python3 maas_cli.py run "import platform; print('Running on:', platform.node())"
+# Run a 4-minute compute benchmark with live streaming progress:
+python3 maas_cli.py run heavy_workload.py -e "Compute stress test"
 ```
 
 #### Option C: Claude Code CLI
-1. Exchange the one-time code for a client token:
-   ```bash
-   curl -s -X POST http://<NODE_IP>:7420/api/pair \
-     -H 'Content-Type: application/json' \
-     -d '{"code":"<8_DIGIT_CODE>"}'
-   ```
-2. Add the MCP server to Claude Code:
-   ```bash
-   claude mcp add --transport http --scope user maas-node http://<NODE_IP>:7420/mcp \
-     --header "Authorization: Bearer <TOKEN>"
-   ```
+```bash
+# 1. Obtain token using the one-time code:
+curl -s -X POST http://<NODE_IP>:7420/api/pair -H 'Content-Type: application/json' -d '{"code":"<CODE>"}'
 
-#### Option D: Cursor / Claude Desktop / Antigravity
-Add the stdio bridge to your `mcp_config.json`:
+# 2. Add MCP server:
+claude mcp add --transport http --scope user maas-node http://<NODE_IP>:7420/mcp --header "Authorization: Bearer <TOKEN>"
+```
+
+#### Option D: Cursor / Claude Desktop / Antigravity IDE
+Configure the stdio bridge in your `mcp_config.json`:
 ```json
 {
   "mcpServers": {
@@ -214,21 +224,24 @@ Add the stdio bridge to your `mcp_config.json`:
 
 ---
 
-## 🔬 Structured Failure Taxonomy (Self-Healing AI)
+## 🔬 Self-Healing AI: Structured Failure Taxonomy
 
-When an executed script encounters an error, MAAS returns structured diagnostic information rather than opaque exit codes so the AI agent can diagnose and fix its own code:
+Unlike standard terminal executions that return unhelpful exit codes (like `1` or `137`), MAAS provides machine-readable diagnostic feedback so the AI can diagnose and repair its own code:
 
-- `MODULE_NOT_FOUND`: Includes the missing module name and suggests a `pip` package candidate.
-- `SYNTAX_ERROR`: Identifies the exact script file, line number, and offending character.
-- `OOM_KILLED`: Flags that the job exceeded its memory quota, allowing the agent to suggest batching or streaming.
-- `TIMEOUT`: Notifies the agent that execution exceeded the allocated wall-clock duration.
-- `ILLEGAL_INSTRUCTION`: Warns that compiled binaries or wheels used CPU instructions (like AVX2) unsupported by older hardware.
+- `MODULE_NOT_FOUND`: Pinpoints the exact missing package and suggests candidate `pip` package names.
+- `SYNTAX_ERROR`: Isolates the script file, line number, and offending character.
+- `OOM_KILLED`: Warns that the job exceeded memory limits, prompting the AI to batch or stream data.
+- `TIMEOUT`: Signals that execution hit the wall-clock limit, prompting the AI to optimize complexity.
+- `ILLEGAL_INSTRUCTION`: Warns that compiled binaries or wheels used CPU vector instructions (e.g. AVX2) unsupported by older hardware.
 
 ---
 
 ## 📁 Repository Structure
 
 ```text
+├── assets/                   # High-resolution diagrams & mobile UI mockups
+│   ├── maas_architecture.jpg # 3-device system architecture diagram
+│   └── maas_phone_ui.jpg     # Mobile safety switch interface mockup
 ├── src/
 │   ├── main.cpp              # CLI entry point, signal handling & runtime discovery
 │   ├── server.cpp            # HTTP server, routing & MCP JSON-RPC handler
@@ -245,8 +258,10 @@ When an executed script encounters an error, MAAS returns structured diagnostic 
 ├── third_party/              # Vendored dependencies (cpp-httplib, nlohmann/json, sqlite3)
 ├── tests/
 │   └── e2e.py                # 30-check automated integration test suite
+├── heavy_workload.py         # 4-minute compute benchmark (Monte Carlo + SVD Matrix crunching)
+├── train_iris.py             # Machine learning classification benchmark (Random Forest)
 ├── ollama_agent.py           # Fully local Ollama (Gemma 4) autonomous agent
-├── maas_cli.py               # Lightweight remote client CLI
+├── maas_cli.py               # Live-streaming remote client CLI
 ├── bridge.py                 # Stdio-to-HTTP MCP protocol bridge
 ├── build.sh                  # Native C++ build script (optimised / debug)
 └── install.sh                # Zero-dependency OS installer
@@ -256,5 +271,5 @@ When an executed script encounters an error, MAAS returns structured diagnostic 
 
 ## 📜 License
 
-MAAS is open-source software licensed under the **[MIT License](LICENSE)**.
+MAAS is open-source software licensed under the **[MIT License](LICENSE)**.  
 Vendored libraries (`sqlite3`, `nlohmann/json`, `cpp-httplib`, `qrcodegen`) retain their respective open-source licenses.
